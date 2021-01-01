@@ -1,0 +1,180 @@
+---
+title: first post
+author: Jiheun
+date: '2021-01-01'
+slug: first-post
+categories:
+  - R
+tags:
+  - R Markdown
+---
+
+ 이 코드의 목적은 1차년도 진행된 7개 댐(대청댐, 보령댐, 부안댐, 소양강-충주댐, 용담댐, 운문댐, 평림댐)에 대한 용수공급능력 계산과정 및 모의 결과를 검증하는데 있다. 기존의 계산방법으로부터 수정되는 내용은 다음과 같다.
+
+  1. 방류량이 저수위 가뭄단계에 따라 변화
+  2. 자료의 형식을 구축하고, 함수를 만들어 사용
+    - Dropbox에 자료 제목, 형식 정확하게 정리하기
+  3. 재현기간별 빈도유입량에 따른 민감도 분석
+  4. 공주대 1차년도 최종 산정 모의유량 값 사용 (2020/12/9 받은 자료)
+
+
+1. 시간에 따라 Release와 Inflow가 변하지 않는다고 가정하고 계산을 진행하면 각 가뭄단계별 저수위와 공급량을 고려한 용수공급일수는다음과 같이 계산할 수 있다. 
+```{r}
+Storage = 500 #공주대에서 받는 시작시점의 수위
+Level1 = 300; Level2 = 200; Level3 = 100; Level4 = 50 #각 시점의 가뭄단계별 저수위.LV0:정상, LV1:관심, LV2:주의, LV3:경계, LV4:심각
+Release0 =25; Release1 = 20; Release2 = 15; Release3 = 10; Release4 = 5 #각 시점의 가뭄단계별 방류량. Release0은 정상단계에서 공급량(방류량), 
+Inflow = 0.5 #빈도유입량
+count = 1
+while (Storage >= 0){
+  if(Storage >= Level1){
+    Storage = Storage - Release0 + Inflow
+  }
+  else if(Storage >= Level2){
+    Storage = Storage - Release1 + Inflow
+  }
+  else if(Storage >= Level3){
+    Storage = Storage - Release2 + Inflow
+  }
+  else if(Storage >= Level4){
+    Storage = Storage - Release3 + Inflow
+  }
+  else if(Level4 > Storage){
+    Storage = Storage - Release4 + Inflow
+  }
+  else{break}
+  print(paste(count,"일차 공급시 남은 저수량은",Storage))
+  count = count + 1
+} 
+```
+
+2. 이번에는 빈도유입량과 방류량이 시간에 따라 변화하도록 설정해준다.
+예제([다운로드](https://www.dropbox.com/s/4bckoj3xn1rq4l4/Example2.csv?dl=0))는 순별로 가뭄단계별 기준 저수량 및 방류량, 유입량이 변하도록 설정하였다.
+```{r}
+Example2 <- read.csv("/Users/jiheun/Dropbox/Project/1.연구실프로젝트/3.유역별가뭄대응력/Jiheun/용수공급가능일수/Example2.csv", header=TRUE)
+print(Example2)
+
+targetDate = 1 #1번째 순서, 즉, 2020.1.1일
+Storage = Example2$Storage[targetDate] #공주대로부터 제공받은 2020.1.1일의 수위
+Level1 = Example2$Level1; Level2 = Example2$Level2; Level3 = Example2$Level3; Level4 = Example2$Level4 #각 시점의 가뭄단계별 저수위
+Release1 = Example2$Release1; Release2 = Example2$Release2; Release3 = Example2$Release3; Release4 = Example2$Release4; Release5 = Example2$Release5 #각 시점의 가뭄단계별 방류량
+Inflow = Example2$Inflow #빈도유입량
+
+count = 1
+while (Storage >= 0){
+  if(Storage >= Level1[targetDate+count-1]){
+    Storage = Storage - Release1[targetDate+count-1] + Inflow[targetDate+count-1]
+  }
+  else if(Storage >= Level2[targetDate+count-1]){
+    Storage = Storage - Release2[targetDate+count-1] + Inflow[targetDate+count-1]
+  }
+  else if(Storage >= Level3[targetDate+count-1]){
+    Storage = Storage - Release3[targetDate+count-1] + Inflow[targetDate+count-1]
+  }
+  else if(Storage >= Level4[targetDate+count-1]){
+    Storage = Storage - Release4[targetDate+count-1] + Inflow[targetDate+count-1]
+  }
+  else if(Level4[targetDate+count-1] > Storage){
+    Storage = Storage - Release5[targetDate+count-1] + Inflow[targetDate+count-1]
+  }
+  else{break}
+  #print(paste(count,"일차 빈도유입량은", Inflow[targetDate+count-1],"공급후 남은 저수량은",Storage))
+  count = count + 1
+}
+```
+
+3. 보령댐 예시([다운로드](https://www.dropbox.com/s/pcp9yhax7hk8nr6/Boryung.csv?dl=0))를 통해 다음과 같이 계산할 수 있다.
+
+```{r}
+
+Data <- read.csv("/Users/jiheun/Dropbox/Project/1.연구실프로젝트/3.유역별가뭄대응력/Jiheun/용수공급가능일수/Boryung.csv",header=TRUE)
+head(Data)
+
+targetDate = 7959
+S1 = Data$S1[targetDate]; S2 = Data$S2[targetDate]; S3 = Data$S3[targetDate]; S4 = Data$S4[targetDate]; S5 = Data$S5[targetDate]
+LV1 = Data$LV1; LV2 = Data$LV2; LV3 = Data$LV3; LV4 = Data$LV4
+R0 = Data$R0; R1 = Data$R1; R2 = Data$R2; R3 = Data$R3; R4 = Data$R4
+Q20 = Data$Q20 #빈도유입량
+
+count = 1
+Storage = S1
+while (Storage >= 0){
+  if(Storage >= LV1[targetDate+count-1]){
+    Storage = Storage - R0[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else if(Storage >= LV2[targetDate+count-1]){
+    Storage = Storage - R1[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else if(Storage >= LV3[targetDate+count-1]){
+    Storage = Storage - R2[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else if(Storage >= LV4[targetDate+count-1]){
+    Storage = Storage - R3[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else if(LV4[targetDate+count-1] > Storage){
+    Storage = Storage - R4[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else{break}
+  print(paste(count,"일차 빈도유입량은", Q20[targetDate+count-1],"공급후 남은 저수량은",Storage))
+  count = count + 1
+}
+count = 1
+Storage = S3
+while (Storage >= 0){
+  if(Storage >= LV1[targetDate+count-1]){
+    Storage = Storage - R0[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else if(Storage >= LV2[targetDate+count-1]){
+    Storage = Storage - R1[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else if(Storage >= LV3[targetDate+count-1]){
+    Storage = Storage - R2[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else if(Storage >= LV4[targetDate+count-1]){
+    Storage = Storage - R3[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else if(LV4[targetDate+count-1] > Storage){
+    Storage = Storage - R4[targetDate+count-1] + Q20[targetDate+count-1]
+  }
+  else{break}
+  #print(paste(count,"일차 빈도유입량은", Q20[targetDate+count-1],"공급후 남은 저수량은",Storage))
+  count = count + 1
+}
+
+```
+
+4. 따라서 계산의 편의를 위해, <span style="color:red">용수공급일수 계산 함수(WSDay)</span>를 다음과 같이 정의할 수 있다.
+```{r}
+WSDay <- function(targetDate, Data, Start_Storage, LWL, Inflow){
+  count = 1
+  Storage = Start_Storage[targetDate]
+  while (Storage >= LWL){
+    if(Storage >= Data$LV1[targetDate+count-1]){
+      Storage = Storage - Data$R0[targetDate+count-1] + Inflow[targetDate+count-1]
+    }
+    else if(Storage >= Data$LV2[targetDate+count-1]){
+      Storage = Storage - Data$R1[targetDate+count-1] + Inflow[targetDate+count-1]
+    }
+    else if(Storage >= Data$LV3[targetDate+count-1]){
+      Storage = Storage - Data$R2[targetDate+count-1] + Inflow[targetDate+count-1]
+    }
+    else if(Storage >= Data$LV4[targetDate+count-1]){
+      Storage = Storage - Data$R3[targetDate+count-1] + Inflow[targetDate+count-1]
+    }
+    else if(Data$LV4[targetDate+count-1] > Storage){
+      Storage = Storage - Data$R4[targetDate+count-1] + Inflow[targetDate+count-1]
+    }
+    else{break}
+    print(paste(count,"일차 빈도유입량은", Inflow[targetDate+count-1],", 공급후 남은 저수량은",Storage))
+    count = count + 1
+  }
+  return(count-1)
+}
+
+Br <- read.csv("/Users/jiheun/Dropbox/Project/1.연구실프로젝트/3.유역별가뭄대응력/Jiheun/용수공급가능일수/Boryung.csv",header=TRUE)
+WSDay(targetDate = 8000, Data=Br, Br$S3, LWL=6.1, Br$Q20)
+
+```
+
+
+
+
